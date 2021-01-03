@@ -4,6 +4,7 @@
 import unittest
 
 from lnk_heymac.lnk_heymac_cmd import *
+from lnk_heymac.lnk_heymac_cmd_asoc import *
 
 
 class TestHeyMacCmd(unittest.TestCase):
@@ -38,23 +39,23 @@ class TestHeyMacCmd(unittest.TestCase):
         self.assertEqual(c.get_field(HeymacCmd.FLD_NGBRS), (b"\xfd2345678",))
 
 
-    def test_join_rqst(self,):
+    def test_asoc_rqst(self,):
         # Build and serialize
-        c = HeymacCmdJoinRqst(FLD_NET_ID=0x0102)
+        c = HeymacCmdAsocRqst(FLD_NET_ID=0x0102)
         b = bytes(c)
         self.assertEqual(b, b"\x85\x01\x01\x02")
         # Parse and test
         c = HeymacCmd.parse(b)
-        self.assertIs(type(c), HeymacCmdJoinRqst)
+        self.assertIs(type(c), HeymacCmdAsocRqst)
 
 
-    def test_join_rqst_bad_fld(self,):
-        def _join_rqst_bad_fld():
-            c = HeymacCmdJoinRqst(FLD_BOB=0x0102)
-        self.assertRaises(HeymacCmdError, _join_rqst_bad_fld)
+    def test_asoc_rqst_bad_fld(self,):
+        def _asoc_rqst_bad_fld():
+            c = HeymacCmdAsocRqst(FLD_BOB=0x0102)
+        self.assertRaises(HeymacCmdError, _asoc_rqst_bad_fld)
 
 
-    def test_join_rqst_bad_data(self,):
+    def test_asoc_rqst_bad_data(self,):
         # Bad CMD_ID
         self.assertRaises(HeymacCmdError, HeymacCmd.parse, b"\xFF\x01\x01\x02")
         # Bad SUB_ID
@@ -65,23 +66,23 @@ class TestHeyMacCmd(unittest.TestCase):
         self.assertRaises(HeymacCmdError, HeymacCmd.parse, b"\x85\x01\x01\x02\x03")
 
 
-    def test_join_acpt(self,):
+    def test_asoc_acpt(self,):
         # Build and serialize
-        c = HeymacCmdJoinAcpt(FLD_NET_ID=0x0102, FLD_NET_ADDR=0x0123)
+        c = HeymacCmdAsocAcpt(FLD_NET_ID=0x0102, FLD_NET_ADDR=0x0123)
         b = bytes(c)
         self.assertEqual(b, b"\x85\x02\x01\x02\x01\x23")
         # Parse and test
         c = HeymacCmd.parse(b)
-        self.assertIs(type(c), HeymacCmdJoinAcpt)
+        self.assertIs(type(c), HeymacCmdAsocAcpt)
 
 
-    def test_join_acpt_bad_fld(self,):
-        def _join_acpt_bad_fld():
-            c = HeymacCmdJoinAcpt(FLD_NET_ID=0x0102, FLD_BOB=0x0304)
-        self.assertRaises(HeymacCmdError, _join_acpt_bad_fld)
+    def test_asoc_acpt_bad_fld(self,):
+        def _asoc_acpt_bad_fld():
+            c = HeymacCmdAsocAcpt(FLD_NET_ID=0x0102, FLD_BOB=0x0304)
+        self.assertRaises(HeymacCmdError, _asoc_acpt_bad_fld)
 
 
-    def test_join_acpt_bad_data(self,):
+    def test_asoc_acpt_bad_data(self,):
         # Bad CMD_ID
         self.assertRaises(HeymacCmdError, HeymacCmd.parse, b"\xFF\x02\x01\x02\x03\x04")
         # Bad SUB_ID
@@ -92,23 +93,23 @@ class TestHeyMacCmd(unittest.TestCase):
         self.assertRaises(HeymacCmdError, HeymacCmd.parse, b"\x85\x02\x01\x02\x03\x04\x05")
 
 
-    def test_join_cnfm(self,):
+    def test_asoc_cnfm(self,):
         # Build and serialize
-        c = HeymacCmdJoinCnfm(FLD_NET_ID=0x0102, FLD_NET_ADDR=0x0123)
+        c = HeymacCmdAsocCnfm(FLD_NET_ID=0x0102, FLD_NET_ADDR=0x0123)
         b = bytes(c)
         self.assertEqual(b, b"\x85\x03\x01\x02\x01\x23")
         # Parse and test
         c = HeymacCmd.parse(b)
-        self.assertIs(type(c), HeymacCmdJoinCnfm)
+        self.assertIs(type(c), HeymacCmdAsocCnfm)
 
 
-    def test_join_cnfm_bad_fld(self,):
-        def _join_cnfm_bad_fld():
-            c = HeymacCmdJoinCnfm(FLD_NET_ID=0x0102, FLD_BOB=0x0304)
-        self.assertRaises(HeymacCmdError, _join_cnfm_bad_fld)
+    def test_asoc_cnfm_bad_fld(self,):
+        def _asoc_cnfm_bad_fld():
+            c = HeymacCmdAsocCnfm(FLD_NET_ID=0x0102, FLD_BOB=0x0304)
+        self.assertRaises(HeymacCmdError, _asoc_cnfm_bad_fld)
 
 
-    def test_join_cnfm_bad_data(self,):
+    def test_asoc_cnfm_bad_data(self,):
         # Bad CMD_ID
         self.assertRaises(HeymacCmdError, HeymacCmd.parse, b"\xFF\x03\x01\x02\x03\x04")
         # Bad SUB_ID
@@ -119,23 +120,23 @@ class TestHeyMacCmd(unittest.TestCase):
         self.assertRaises(HeymacCmdError, HeymacCmd.parse, b"\x85\x03\x01\x02\x03\x04\x05")
 
 
-    def test_join_rjct(self,):
+    def test_asoc_rjct(self,):
         # Build and serialize
-        c = HeymacCmdJoinRjct() # no kwargs means ctor expecting bytes
+        c = HeymacCmdAsocRjct() # no kwargs means ctor expecting bytes
         b = bytes(c)
         self.assertEqual(b, b"\x85\x04")
         # Parse and test
         c = HeymacCmd.parse(b)
-        self.assertIs(type(c), HeymacCmdJoinRjct)
+        self.assertIs(type(c), HeymacCmdAsocRjct)
 
 
-    def test_join_rjct_bad_fld(self,):
-        def _join_rjct_bad_fld():
-            c = HeymacCmdJoinRjct(FLD_BOB=0x0304)
-        self.assertRaises(HeymacCmdError, _join_rjct_bad_fld)
+    def test_asoc_rjct_bad_fld(self,):
+        def _asoc_rjct_bad_fld():
+            c = HeymacCmdAsocRjct(FLD_BOB=0x0304)
+        self.assertRaises(HeymacCmdError, _asoc_rjct_bad_fld)
 
 
-    def test_join_rjct_bad_data(self,):
+    def test_asoc_rjct_bad_data(self,):
         # Bad CMD_ID
         self.assertRaises(HeymacCmdError, HeymacCmd.parse, b"\xFF\x04")
         # Bad SUB_ID
@@ -146,23 +147,23 @@ class TestHeyMacCmd(unittest.TestCase):
         self.assertRaises(HeymacCmdError, HeymacCmd.parse, b"\x85\x04\x05")
 
 
-    def test_join_leav(self,):
+    def test_asoc_leav(self,):
         # Build and serialize
-        c = HeymacCmdJoinLeav()
+        c = HeymacCmdAsocLeav()
         b = bytes(c)
         self.assertEqual(b, b"\x85\x05")
         # Parse and test
         c = HeymacCmd.parse(b)
-        self.assertIs(type(c), HeymacCmdJoinLeav)
+        self.assertIs(type(c), HeymacCmdAsocLeav)
 
 
-    def test_join_leav_bad_fld(self,):
-        def _join_leav_bad_fld():
-            c = HeymacCmdJoinLeav(FLD_BOB=0x0304)
-        self.assertRaises(HeymacCmdError, _join_leav_bad_fld)
+    def test_asoc_leav_bad_fld(self,):
+        def _asoc_leav_bad_fld():
+            c = HeymacCmdAsocLeav(FLD_BOB=0x0304)
+        self.assertRaises(HeymacCmdError, _asoc_leav_bad_fld)
 
 
-    def test_join_leav_bad_data(self,):
+    def test_asoc_leav_bad_data(self,):
         # Bad CMD_ID
         self.assertRaises(HeymacCmdError, HeymacCmd.parse, b"\xFF\x05")
         # Bad SUB_ID

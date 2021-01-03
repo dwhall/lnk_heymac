@@ -104,7 +104,7 @@ class LnkData(object):
     # If we don't hear a neighbor (or periodic item)
     # for this many seconds then consider it expired/invalid
     # FIXME: circular dependency:
-    _EXPIRATION_PRD = 4 * 32 # lnk_csma_ahsm.LnkHeymac._BCN_PRD
+    _EXPIRATION_PRD = 4 * 32 # lnk_csma_ahsm.LnkHeymac.BCN_PRD
 
 
     def _process_bcn(self, frame):

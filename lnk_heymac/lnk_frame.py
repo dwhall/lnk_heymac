@@ -93,6 +93,9 @@ class HeymacFrame(object):
     FLD_HOPS = "hops"       # Hops remaining
     FLD_TADDR = "taddr"     # (re)Transmitter address
 
+    # Special addresses
+    LNK_ADDR_BCAST = b"\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF"
+
 
     def __init__(self, pid, fctl):
         """Creates a HeymacFrame starting with the given PID and Fctl."""
@@ -292,6 +295,18 @@ class HeymacFrame(object):
             and 0 != (self.field[HeymacFrame.FLD_FCTL] & HeymacFrame.FCTL_P))
 
 
+    def is_meant_for(self, lnk_addr):
+        """Returns True if this frame is meant for the given address.
+
+        That is, the frame is addressed in a way that the given address
+        should process this frame when received.
+        """
+        dst_addr = self.get_field(HeymacFrame.FLD_DADDR)
+        return (dst_addr is None
+                or dst_addr == lnk_addr
+                or dst_addr == HeymacFrame.LNK_ADDR_BCAST)
+
+
     def set_field(self, fld_nm, value):
         """Stores the field value
         """
@@ -362,28 +377,31 @@ class HeymacFrame(object):
             err_msg = "Fctl value is missing"
 
         # Check that if the bit is set in Fctl,
-        # the data field exists and vice versa
+        # the data field exists and vice versa.
+        # This only applies if the X bit is not set.
         if not err_msg:
             fctl = self.field[HeymacFrame.FLD_FCTL]
-            for bit, field_nm in (
-                    (HeymacFrame.FCTL_N, HeymacFrame.FLD_NETID),
-                    (HeymacFrame.FCTL_D, HeymacFrame.FLD_DADDR),
-                    # (HeymacFrame.FCTL_I, HeymacFrame.FLD_IES), # TODO: IEs
-                    (HeymacFrame.FCTL_S, HeymacFrame.FLD_SADDR),
-                    (HeymacFrame.FCTL_M, HeymacFrame.FLD_HOPS),
-                    (HeymacFrame.FCTL_M, HeymacFrame.FLD_TADDR),):
-                if (bit & fctl and field_nm not in self.field) or \
-                   ((bit & fctl) == 0 and field_nm in self.field):
-                    err_msg = "Fctl bit/value missing for Fctl bit 0x{:x} " \
-                              "and field '{}'".format(bit, field_nm)
-                    break
+            if 0 == (HeymacFrame.FCTL_L & fctl):
+                for bit, field_nm in (
+                        (HeymacFrame.FCTL_N, HeymacFrame.FLD_NETID),
+                        (HeymacFrame.FCTL_D, HeymacFrame.FLD_DADDR),
+                        # (HeymacFrame.FCTL_I, HeymacFrame.FLD_IES), # TODO: IEs
+                        (HeymacFrame.FCTL_S, HeymacFrame.FLD_SADDR),
+                        (HeymacFrame.FCTL_M, HeymacFrame.FLD_HOPS),
+                        (HeymacFrame.FCTL_M, HeymacFrame.FLD_TADDR),):
+                    if (bit & fctl and field_nm not in self.field) or \
+                    ((bit & fctl) == 0 and field_nm in self.field):
+                        err_msg = "Fctl bit/value missing for Fctl bit " \
+                                  "0x{:x} and field '{}'".format(bit, field_nm)
+                        break
 
         # Special cases
-        # If FCTL_L is set, at least one address field must exist
-        if not err_msg and (HeymacFrame.FCTL_L & fctl
-                and HeymacFrame.FLD_DADDR not in self.field
-                and HeymacFrame.FLD_SADDR not in self.field
-                and HeymacFrame.FLD_TADDR not in self.field):
+        # If FCTL_L is not set, FCTL_L is set, at least one addr fld must exist
+        if not err_msg and (0 == (HeymacFrame.FCTL_L & fctl)
+                            and 0 != (HeymacFrame.FCTL_L & fctl)
+                            and HeymacFrame.FLD_DADDR not in self.field
+                            and HeymacFrame.FLD_SADDR not in self.field
+                            and HeymacFrame.FLD_TADDR not in self.field):
             err_msg = "Long address selected, but no address field is present"
 
         # If FCTL_X is set, only the payload should exist

@@ -16,10 +16,16 @@ import phy_sx127x
 from . import lnk_data
 from . import lnk_frame
 from . import lnk_heymac_cmd
+from . import lnk_heymac_cmd_asoc
 
 
 class LnkHeymac(object):
     """Heymac link layer (LNK) protocol values."""
+    # The Beacon Period.
+    # The number of seconds between each emission of a beacon.
+    # This value also affects the time a node spends lurking.
+    BCN_PRD = 32
+
     # Link addresses are 8 octets in size
     # Heymac uses its long-address mode to convey a link address
     LNK_ADDR_SZ = 8
@@ -31,10 +37,6 @@ class LnkHeymac(object):
     LNK_CAP_CRYPTO = 0          # Node is capable of cryptographic routines
     # LNK_CAP_ROOT # No, this is net layer cap
     # LNK_CAP_NVSTO # Node has non-volatile storage (KBs? MBs? GBs?)
-
-    # The number of seconds between each emission of a beacon.
-    # This value also affects the time a node spends lurking.
-    _BCN_PRD = 32
 
     # The number of seconds between each link update period in _linking()
     _LNK_UPDT_PRD = 4
@@ -85,6 +87,29 @@ class LnkHeymacCsmaAhsm(LnkHeymac, farc.Ahsm):
 
         self._lnk_data = lnk_data.LnkData(lnk_addr)
 
+        # Init neighbor dialog state machine container
+        self._ngbr_dlg_sm = {}
+
+        # Init next-layer-higher dialog callback container
+        self._nlh_dlg_clbk = {}
+
+
+    def start_cmd_dlg(self, cmd_id, ngbr_lnk_addr, nlh_clbk, *args):
+        """Starts a command dialog sequence.
+
+        Starts the *DlgInitiatorAhsm with the given args and performs
+        the specific command's dialog sequence.
+        Calls the callback with results.
+        This method is intended to be called by the next layer higher;
+        so the callback calls into that layer.
+        """
+        cmd_dlg_cls = _CMD_DLG_INITR_SM_CLASSES[cmd_id]
+        cmd_dlg_sm = cmd_dlg_cls(ngbr_lnk_addr, *args)
+        priority = self.priority + len(self._ngbr_dlg)
+        cmd_dlg_sm.start(priority)
+        self._ngbr_dlg_sm[ngbr_lnk_addr] = cmd_dlg_sm
+        self._nlh_dlg_clbk[ngbr_lnk_addr] = nlh_clbk
+
 
     def start_stack(self, ahsm_prio, delta_prio=10):
         """Starts this layer of the network stack.
@@ -112,6 +137,7 @@ class LnkHeymacCsmaAhsm(LnkHeymac, farc.Ahsm):
         # Self-signaling
         farc.Signal.register("_ALWAYS")
         farc.Signal.register("_LNK_RXD_FROM_PHY")
+        farc.Signal.register("_LNK_FRAME")
 
         # Self-signaling events
         self._evt_always = farc.Event(farc.Signal._ALWAYS, None)
@@ -164,7 +190,7 @@ class LnkHeymacCsmaAhsm(LnkHeymac, farc.Ahsm):
         sig = event.signal
         if sig == farc.Signal.ENTRY:
             logging.debug("LNK._lurking")
-            self._bcn_evt.post_in(self, 2 * LnkHeymac._BCN_PRD)
+            self._bcn_evt.post_in(self, 2 * LnkHeymac.BCN_PRD)
             return self.handled(event)
 
         elif sig == farc.Signal._LNK_BCN_TMOUT:
@@ -190,7 +216,7 @@ class LnkHeymacCsmaAhsm(LnkHeymac, farc.Ahsm):
         sig = event.signal
         if sig == farc.Signal.ENTRY:
             logging.debug("LNK._beaconing")
-            self._bcn_evt.post_every(self, LnkHeymac._BCN_PRD)
+            self._bcn_evt.post_every(self, LnkHeymac.BCN_PRD)
             self._post_bcn()
             return self.handled(event)
 
@@ -242,6 +268,19 @@ class LnkHeymacCsmaAhsm(LnkHeymac, farc.Ahsm):
 # Private
 
 
+    # Command dialog initiator state machine class lookup table
+    _CMD_DLG_INITR_SM_CLASSES = {
+        lnk_heymac_cmd_asoc.HeymacCmdAsoc.CMD_ID:
+            lnk_heymac_cmd_asoc.HeymacCmdAsocDlgInitiatorAhsm,
+    }
+
+    # Command dialog responder state machine class lookup table
+    _CMD_DLG_RSPDR_SM_CLASSES = {
+        lnk_heymac_cmd_asoc.HeymacCmdAsoc.CMD_ID:
+            lnk_heymac_cmd_asoc.HeymacCmdAsocDlgResponderAhsm,
+    }
+
+
     def _on_rxd_from_phy(self, frame):
         """Processes a frame received from the PHY."""
         assert type(frame) is lnk_frame.HeymacFrame
@@ -267,6 +306,10 @@ class LnkHeymacCsmaAhsm(LnkHeymac, farc.Ahsm):
                                 self._lnk_addr)
                 # Post the frame to PHY for transmission
                 self._post_frm(frame)
+
+        # If the frame is a Heymac command meant for this node
+        if frame.cmd and frame.is_meant_for(self._lnk_addr):
+            self._process_cmd(frame)
 
         # TODO: See if the NET layer wants to process the frame
 
@@ -322,3 +365,28 @@ class LnkHeymacCsmaAhsm(LnkHeymac, farc.Ahsm):
             self.phy_ahsm.TM_NOW,
             LnkHeymac._PHY_STNGS_TX,
             bytes(frame))
+
+
+    def _process_cmd(self, frame):
+        """Processes the Heymac command in the given frame."""
+        print("DWH: _process_cmd")
+        if type(frame.cmd) is lnk_heymac_cmd.HeymacCmdCsmaBcn:
+            # TODO: join any unknown nets
+            pass
+
+        # If the received command involves a dialog
+        elif frame.cmd.CMD_ID in _CMD_DLG_RSPDR_SM_CLASSES:
+            print("DWH: HeymacCmdAsoc")
+            # Create a dialog with the sender if one doesn't exist
+            sender = frame.get_sender()
+            if sender not in self._ngbr_dlg:
+                rspdr_cls = _CMD_DLG_RSPDR_SM_CLASSES[frame.cmd.CMD_ID]
+                self._ngbr_dlg[sender] = rspdr_cls()
+                priority = self.priority + len(self._ngbr_dlg)
+                self._ngbr_dlg[sender].start(priority)
+
+            # Dispatch the frame event to the dialog state machine
+            evt = farc.Event(farc.Signal._LNK_FRAME, frame)
+            self._ngbr_dlg[sender].dispatch(evt)
+
+            # TODO: get response from state machine
